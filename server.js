@@ -23,11 +23,16 @@ await connectDB();
 const app = express();
 
 // 👇 2) enable CORS for your frontend
-app.use(
-  cors({
-    origin: ["http://localhost:4200", "http://127.0.0.1:4200","httpS://atreeinmypocket.com"],
-  })
-);
+app.use(cors({
+  origin: [
+    'http://localhost:4200',
+    'http://127.0.0.1:4200',
+    'https://atreeinmypocket.com',
+    'https://www.atreeinmypocket.com'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  credentials: true
+}));
 
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
