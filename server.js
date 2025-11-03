@@ -37,7 +37,9 @@ app.use("/api/hero", heroRouter);
 
 app.use("/api/admin", adminRouter);
 app.use("/api/movements", movementsRouter);
-
+app.get("/api/test", (req, res) => {
+  res.json({ success: true, message: "Backend is live and connected!" });
+});
 
 app.listen(config.PORT, () => {
   console.log(`✅ ATIMP API running on port ${config.PORT}`);
