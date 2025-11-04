@@ -1,16 +1,33 @@
 // src/lib/mailer.js
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
+
 dotenv.config();
+
 export function buildTransporter() {
   const host = process.env.MAIL_HOST || "smtp.gmail.com";
   const port = Number(process.env.MAIL_PORT || 465);
-  const secure = (process.env.MAIL_SECURE || "true") === "true";
+  const secure =
+    process.env.MAIL_SECURE != null
+      ? process.env.MAIL_SECURE === "true"
+      : port === 465;
+
   const user = process.env.MAIL_USER;
   const pass = process.env.MAIL_PASS;
 
+  // 🔍 Log what config we're using (but NEVER the password)
+  console.log(">>> [MAIL] Building transporter with config:", {
+    host,
+    port,
+    secure,
+    user,
+    hasPass: !!pass,
+  });
+
   if (!user || !pass) {
-    console.warn("⚠️ Mailer not configured (missing MAIL_USER or MAIL_PASS)");
+    console.warn(
+      "⚠️ [MAIL] Mailer not configured (missing MAIL_USER or MAIL_PASS)"
+    );
     return null;
   }
 
@@ -21,10 +38,15 @@ export function buildTransporter() {
     auth: { user, pass },
   });
 
+  // ✅ Full error object, not just message
   transporter
     .verify()
-    .then(() => console.log(`📧 Mailer: connected to ${host} (secure: ${secure})`))
-    .catch((err) => console.warn("⚠️ Mailer verify failed:", err.message));
+    .then((info) => {
+      console.log(">>> [MAIL] verify OK:", info);
+    })
+    .catch((err) => {
+      console.error("❌ [MAIL] verify FAILED:", err);
+    });
 
   return transporter;
 }
@@ -32,18 +54,33 @@ export function buildTransporter() {
 const transporter = buildTransporter();
 
 export async function sendJoinMail(payload) {
-  if (!transporter) return { ok: false, error: "mailer-not-configured" };
+  if (!transporter) {
+    console.error("❌ [MAIL] sendJoinMail called but transporter is null");
+    return { ok: false, error: "mailer-not-configured" };
+  }
 
   const to = process.env.MAIL_TO || process.env.MAIL_USER;
   const subject = `[ATIMP] New join request (${payload.role || "unknown"})`;
   const text = JSON.stringify(payload, null, 2);
 
-  await transporter.sendMail({
-    from: `"A Tree in My Pocket" <${process.env.MAIL_USER}>`,
-    to,
-    subject,
-    text,
-  });
+  try {
+    console.log(">>> [MAIL] Sending join mail", {
+      to,
+      subject,
+      preview: payload?.email || payload?.name || null,
+    });
 
-  return { ok: true };
+    const info = await transporter.sendMail({
+      from: `"A Tree in My Pocket" <${process.env.MAIL_USER}>`,
+      to,
+      subject,
+      text,
+    });
+
+    console.log(">>> [MAIL] sendJoinMail OK, messageId:", info.messageId);
+    return { ok: true };
+  } catch (err) {
+    console.error("❌ [MAIL] sendJoinMail FAILED:", err);
+    return { ok: false, error: "send-failed", details: err.message };
+  }
 }
