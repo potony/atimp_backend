@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 function buildPublicUrl(relPath) {
-  const base = process.env.API_PUBLIC_BASE || "http://localhost:5000";
+  const base = process.env.API_PUBLIC_BASE;
   return `${base}${relPath}`;
 }
 
