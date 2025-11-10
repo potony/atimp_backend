@@ -1,86 +1,49 @@
-// src/lib/mailer.js
-import nodemailer from "nodemailer";
+ // src/lib/mailer.js
+import { Resend } from "resend";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-export function buildTransporter() {
-  const host = process.env.MAIL_HOST || "smtp.gmail.com";
-  const port = Number(process.env.MAIL_PORT || 465);
-  const secure =
-    process.env.MAIL_SECURE != null
-      ? process.env.MAIL_SECURE === "true"
-      : port === 465;
+const resendKey = process.env.RESEND_API_KEY;
+const resend = resendKey ? new Resend(resendKey) : null;
 
-  const user = process.env.MAIL_USER;
-  const pass = process.env.MAIL_PASS;
-
-  // 🔍 Log what config we're using (but NEVER the password)
-  console.log(">>> [MAIL] Building transporter with config:", {
-    host,
-    port,
-    secure,
-    user,
-    hasPass: !!pass,
-  });
-
-  if (!user || !pass) {
-    console.warn(
-      "⚠️ [MAIL] Mailer not configured (missing MAIL_USER or MAIL_PASS)"
-    );
-    return null;
-  }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: { user, pass },
-  });
-
-  // ✅ Full error object, not just message
-  transporter
-    .verify()
-    .then((info) => {
-      console.log(">>> [MAIL] verify OK:", info);
-    })
-    .catch((err) => {
-      console.error("❌ [MAIL] verify FAILED:", err);
-    });
-
-  return transporter;
+if (!resend) {
+  console.warn("⚠️ [MAIL] Mailer not configured (missing RESEND_API_KEY)");
 }
 
-const transporter = buildTransporter();
-
 export async function sendJoinMail(payload) {
-  if (!transporter) {
-    console.error("❌ [MAIL] sendJoinMail called but transporter is null");
+  if (!resend) {
+    console.error("❌ [MAIL] sendJoinMail called but Resend not configured");
     return { ok: false, error: "mailer-not-configured" };
   }
 
-  const to = process.env.MAIL_TO || process.env.MAIL_USER;
+  const toRaw = process.env.MAIL_TO || process.env.MAIL_USER;
+  const to = toRaw.split(",").map((v) => v.trim()).filter(Boolean);
+
   const subject = `[ATIMP] New join request (${payload.role || "unknown"})`;
   const text = JSON.stringify(payload, null, 2);
 
-  try {
-    console.log(">>> [MAIL] Sending join mail", {
-      to,
-      subject,
-      preview: payload?.email || payload?.name || null,
-    });
+  console.log(">>> [MAIL] Sending join mail via Resend", { to, subject });
 
-    const info = await transporter.sendMail({
-      from: `"A Tree in My Pocket" <${process.env.MAIL_USER}>`,
+  try {
+    const { error } = await resend.emails.send({
+      from:
+        process.env.MAIL_FROM ||
+        "A Tree in My Pocket <notifications@atreeinmypocket.com>",
       to,
       subject,
       text,
     });
 
-    console.log(">>> [MAIL] sendJoinMail OK, messageId:", info.messageId);
+    if (error) {
+      console.error("❌ [MAIL] sendJoinMail FAILED:", error);
+      return { ok: false, error: error.message || "send-failed" };
+    }
+
+    console.log("✅ [MAIL] sendJoinMail OK");
     return { ok: true };
   } catch (err) {
-    console.error("❌ [MAIL] sendJoinMail FAILED:", err);
-    return { ok: false, error: "send-failed", details: err.message };
+    console.error("❌ [MAIL] Unexpected error:", err.message);
+    return { ok: false, error: err.message };
   }
 }
