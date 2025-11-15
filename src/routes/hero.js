@@ -15,9 +15,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // helper to build full URL visible to frontend
+// We return a relative API path; the frontend will prefix with apiBase.
 function buildPublicUrl(relPath) {
-  const base = process.env.API_PUBLIC_BASE ;
-  return `${base}${relPath}`;
+  return relPath;
 }
 
 /**
